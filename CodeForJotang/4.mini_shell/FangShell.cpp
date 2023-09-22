@@ -1,28 +1,57 @@
 #include <iostream>
 #include <string>
+#include <sys/types.h>
 #include <unistd.h>
-#define DELIM " \t\r\n"  //the condition of spilt the string
+using namespace std; // for nearly all objects we use are in STL
 
-std::string line;
-std::string read(void) // read
+#define DELIM " \t\r\n" // the condition of spilting the string
+
+// commands bulit inside the shell
+string commandlist[] = {"cd", "help", "exit", "alias", "kill", "pwd"};
+int (*commandtofind[])()
 {
-    // In c++ we dont need  buffersize and reacllocate and staff for using string
-    getline(std::cin, line);
+}
+int cd()
+{
+}
+int help()
+{
+}
+int exit()
+{
+}
+int alias()
+{
+}
+int kill()
+{
+}
+int pwd()
+{
 }
 
-std::string token;
-std::string arg[];
-std::string command;
-std::string parse()
+// read and parse
+string aline;
+string command;
+string tokens[25];
+void stringsplit(string str, string delim, string (&targetstr)[])
 {
-    command = strtok(line, DELIM); 
-    while(line!=NULL)
+    int num = 0;
+    istringstream ins(str);
+    string token;
+    while (getline(ins, token, ' '))
     {
-        
+        targetstr[num].push_back(token);
+        num++;
     }
+    // should be release after execute
 }
 
-bool execute(std::string command)
+// execute
+int execute(string command, string args[])
+{
+}
+int launch(string args[])
 {
 }
 
@@ -31,12 +60,11 @@ void loop() //  basic lifetime
     int STATUS; // save the condition of loop in a variable
     do          // keep(?) the prompt while active
     {
-        std::string prompt = "";
-        std::cout << prompt << ">" << std::endl;
+        string prompt = "[FangShell]"+getpwuid((getuid()))+'@'+gethostname()+':'+getcwd() +(geteuid()==0?'#':'$'+);
+        cout << prompt < < < < endl;
     } while (STATUS);
-    read();
-    parse();
-    execute();
+    stringsplit(aline, DELIM, tokens);
+    execute(tokens[0], tokens);
 }
 
 int main()
