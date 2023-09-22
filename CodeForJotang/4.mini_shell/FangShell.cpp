@@ -8,7 +8,10 @@ using namespace std; // for nearly all objects we use are in STL
 
 // commands bulit inside the shell
 string commandlist[] = {"cd", "help", "exit", "alias", "kill", "pwd"};
-int (*commandtofind[])()
+int (*commandtofind[])()=
+{
+    &cd,&help,&exit,&alias,&kill,&pwd
+}
 {
 }
 int cd()
@@ -61,7 +64,7 @@ void loop() //  basic lifetime
     do          // keep(?) the prompt while active
     {
         string prompt = "[FangShell]"+getpwuid((getuid()))+'@'+gethostname()+':'+getcwd() +(geteuid()==0?'#':'$'+);
-        cout << prompt < < < < endl;
+        cout << prompt <<endl;
     } while (STATUS);
     stringsplit(aline, DELIM, tokens);
     execute(tokens[0], tokens);
