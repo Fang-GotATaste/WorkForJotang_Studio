@@ -11,6 +11,8 @@
 char cmdin[256];
 char *tokens[128];
 int tokenindex = 0;
+int papetokenindex = 0;
+char *papetokens[8][128];
 
 char *aliaslist[128];
 char *aliasnamelist[128];
@@ -37,6 +39,7 @@ int cd(char *path) // 接受一个字符串地址；这里c指针和数组在参
 }
 int help()
 {
+    printf("INTENTATION SHOULD BE STRICT CONSIDERING THE CODE QUALITY\n");
     printf("THERE ARE USABLE INNER COMMAND:\n");
     int commandNum = sizeof(commandlist) / sizeof(commandlist[0]);
     for (int i = 0; i < commandNum; i++)
@@ -145,7 +148,7 @@ int read()
 // 参数分割
 int split(char *cmdin)
 {
-    // 要求能以多种符号作为分隔符，多个空格和空格夹住的符号，识别引号包住的字符串,解析管道符和重定向分支
+    // 要求能以多种符号作为分隔符，多个空格和空格夹住的符号，识别引号包住的字符串,解析管道和文件重定向
     char *token;
     token = strtok(cmdin, TOK_DELIM);
     for (int i = 0; i < aliasindex; i++)
@@ -171,29 +174,57 @@ int split(char *cmdin)
         token = strtok(cmdin, TOK_DELIM);
     }
     token[tokenindex] = NULL;
+    // 判断记录是否有管道重定向并分割
+    for (int i = 0; i < tokenindex; i++)
+    {
+        int index = 0;
+        if (tokens[i] == "|")
+        {
+            papetokenindex++;
+        }
+        else
+            papetokens[papetokenindex][index] = tokens[i];
+        index++;
+    }
 }
-// 执行判断
+//重定向执行判断 调用exectue
+int rediectloop()
+{
+    // 判断是否有文件重定向
+    int FILEOUTA = 0, FILEOUTC = 0, FILEIN = 0;
+    if (papetokens[0][1] == ">")
+    {
+        FILEOUTC = 1;
+    }
+    if (papetokens[0][1] == ">>")
+    {
+        FILEOUTA = 1;
+    }
+    if (papetokens[papetokenindex][1] == "<")
+    {
+        FILEIN = 1;
+    }
+    for(int )
+}
+// 一般执行判断
 int exectue(char **args)
 {
-    //基本输入判断
+    // 基本输入判断
     if (args[0] == NULL || args[0][0] == '\0')
     {
         perror("incorrect args input in exectue period");
     }
-    //先判断是否有重定向
-    for(int i=0;i<tokenindex;i++)
+    
+    for (int i = papetokenindex; i <= 0; i--)
     {
-        
-    }
-    // 如果是内置命令，函数数组中寻找命令
-    int commandNum = sizeof(commandlist) / sizeof(commandlist[0]);
-    for (int i = 0; i < commandNum; i++)
-    {
-        if ()
-    }
-    // 如果是外置命令，进行调用
-    else
-    {
+
+        // 如果是内置命令，函数数组中寻找命令
+        int commandNum = sizeof(commandlist) / sizeof(commandlist[0]);
+        for (int j = 0; j < commandNum; j++)
+        {
+            if (commandlist[j] ==)
+        }
+        // 如果是外置程序，进行调用
     }
 }
 // 程序循环
@@ -209,16 +240,14 @@ void loop()
 
         // 读取命令
         read();
-        //
+        split(cmdin);
+        rediectloop();
 
-        //?  args[0] = cmdin;  ?
-        split();
-        exectue();
-        tokenindex=0;
-        strcpy(cmdin,NULL);
-        for(int i=0;i<128;i++)
+        tokenindex = 0;
+        strcpy(cmdin, NULL);
+        for (int i = 0; i < 128; i++)
         {
-            strcpy(token[i],NULL);
+            strcpy(token[i], NULL);
         }
     } while (STATUS);
 }
