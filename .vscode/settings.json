@@ -40,6 +40,7 @@
         "streambuf": "cpp",
         "typeinfo": "cpp",
         "types.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "stdio.h": "c"
     }
 }

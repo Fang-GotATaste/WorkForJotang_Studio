@@ -1,13 +1,20 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <pwd.h>
+#include <sys/utsname.h>
 
 #define TOK_DELIM " \t\r\n="
 // 全局变量
+int STATUS = 1;
+int fdhistory;
+
 char cmdin[256];
 char *tokens[128];
 int tokenindex = 0;
@@ -22,13 +29,9 @@ int fdout, fdin;
 // int cmdNum, varNum;
 // char envVar[MAX_VAR_NUM][MAX_PATH_LENGTH];
 //  内建命令的函数指针列表化
-char *commandlist[] = {"cd", "help", "exit", "alias", "kill", "pwd", "unalias", "export", "unset"};
-int (*commandtofind[])() =
-    {
-        &cd, &help, &exit, &alias, &kill, &pwd, &unalias, &export, &unset}
+char *commandlist[] = {"cd", "help", "myexit", "alias", /*"kill"*/"pwd", "unalias", "export", "unset"};
 
-    char *
-    *cd(char **args) // 接受一个字符串地址；这里c指针和数组在参数里怎么用一开始把我弄晕了；应当传入解引用的字符数组
+    char **cd(char **args) // 接受一个字符串地址；这里c指针和数组在参数里怎么用一开始把我弄晕了；应当传入解引用的字符数组
 {
     char *path = args[1];
     char **result;
@@ -55,7 +58,7 @@ char **help(char **args)
     }
     return result;
 }
-char **exit(char **args)
+char **myexit(char **args)
 {
     char **result = NULL;
     STATUS = 0;
@@ -76,7 +79,7 @@ char **alias(char **args)
     {
         for (int i = 0; i <= aliasindex; i++)
         {
-            printf("%s='%s'\n", aliasnamelist, aliaslist);
+            printf("%s='%s'\n", aliasnamelist[i], aliaslist[i]);
         }
     }
     else
@@ -113,9 +116,9 @@ char **unalias(char **args)
     }
     return result;
 }
-char **kill(char **args)
-{
-}
+//char **kill(char **args)
+//{
+//}
 char **pwd(char **args)
 {
     char **result = NULL;
@@ -165,16 +168,20 @@ char **unset(char **args)
     printf("Unset environment variable: %s\n", varname);
     return result;
 }
-
+char **(*commandtofind[])(char **) =
+    {
+        &cd, &help, &myexit, &alias, /*&kill*/ &pwd, &unalias, &export, &unset};
 // 命令读取
-int read()
+
+void readline()
 {
+    
     /*原教程的输入逻辑
       fflush(stdin);
       fgets(cmdin, 256, stdin);*/
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF)
-        ;
+    //int c;
+    //while ((c = getchar()) != '\n' && c != EOF)
+        //;
     fgets(cmdin, 256, stdin);
     write(fdhistory, cmdin, sizeof(cmdin));
 
@@ -193,25 +200,31 @@ int split(char *cmdin, char **tokens, bool PAPEORNOT) // 参数从一个加到�
     {
         if (token == aliasnamelist[i])
         {
-            split(aliaslist[i], tokens, TRUE);
+            split(aliaslist[i], tokens, 1);
         }
     }
-    while (token != NUll)
+    while (token != NULL)
     {
+        int checkthealias=0;
         //  参数分割时进行别名的替换
         for (int i = 0; i < aliasindex; i++)
         {
             if (token == aliasnamelist[i])
             {
-                split(aliaslist[i], tokens, TRUE);
-                break;
+                 checkthealias =1;
+                split(aliaslist[i], tokens, 1);
             }
         }
-        else tokens[tokenindex] = token;
+        if(checkthealias ==1)
+        {
+            checkthealias =0;
+            break;
+        }
+        tokens[tokenindex] = token;
         tokenindex++; // wc，我甚至混用全局变量和函数参数来控制执行，函数可以复用，但是不完全可以复用
         token = strtok(cmdin, TOK_DELIM);
     }
-    token[tokenindex] = NULL;
+    tokens[tokenindex] = NULL;
     // 判断记录是否有管道重定向并分割
     if (PAPEORNOT)
     {
@@ -227,6 +240,66 @@ int split(char *cmdin, char **tokens, bool PAPEORNOT) // 参数从一个加到�
             index++;
         }
     }
+}
+// 一般执行判断
+char *exectue(char **args) // 这里就要返回管道的程序的返回值
+{
+    char *result = NULL;
+    // 基本输入判断
+    if (args[0] == NULL || args[0][0] == '\0')
+    {
+        perror("incorrect args input in exectue period");
+    }
+
+    // 如果是内置命令，函数数组中寻找命令
+    int commandNum = sizeof(commandlist) / sizeof(commandlist[0]);
+    for (int j = 0; j < commandNum; j++)
+    {
+        if (strcmp(commandlist[j], args[0]) == 0)
+        {
+            char **temp=(*commandtofind[j])(args);
+            result =temp[0];
+            return result;
+             // 为了这个当时定下来的内建函数列表把所有内建函数全部改成了接受char**返回char**的鬼样子
+        }
+    }
+    // 如果是外置程序，进行调用
+    pid_t wpid;
+    int status;
+    int pipefd[2];
+    pid_t pid = fork();
+    if (pipe(pipefd) == -1) {
+        perror("Error in create pipe");
+        return NULL;
+    }
+    if (pid == -1)
+    {
+        perror("Error in fork the child process");
+        return result;
+    }
+    else if (pid == 0) // 如果是子进程
+    {
+        // 进行管道输出
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        if (execvp(args[0], args) == -1)
+            perror("Error in execvp the program");
+    }
+    else  // 如果是父进程
+    {
+        close(pipefd[1]);
+        int byteNum=read(pipefd[0], result, sizeof(result));
+        if(byteNum<0)
+        {
+            perror("Cant read from the pipe pipefd[1]");
+        }
+        do
+        {
+            wpid = waitpid(pid, &status, WUNTRACED);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    }
+    // 读取管道输入并进行返回
+    return result;
 }
 // 重定向执行判断 其中调用exectue
 int rediectloop()
@@ -251,7 +324,7 @@ int rediectloop()
         {
             fdout = open(papetokens[0][2], O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IXUSR);
             FILEOUTC = 0;
-            if (fileDescriptor == -1)
+            if (fdout == -1)
             {
                 perror("Error in open the redirect file");
                 return 0;
@@ -292,9 +365,9 @@ int rediectloop()
                 perror("Error redirect to stdin");
                 return 0;
             }
-            scanf("%s", &filecontent);
+            scanf("%s", filecontent);
             tokenindex = 2;
-            split(filecontent, papetokens[papetokenindex], FALSE);
+            split(filecontent, papetokens[papetokenindex], 0);
         }
     }
     // 执行有管道部分
@@ -307,83 +380,42 @@ int rediectloop()
         char *rediectback;
         // 不是在这里进行管道读入而是接受exectue的返回
         tokenindex = sizeof(papetokens[papetokenindex]) / sizeof(papetokens[papetokenindex][0]);
-        split(rediectback, papetokens[papetokenindex], FALSE);
+        split(rediectback, papetokens[papetokenindex], 0);
         rediectback = exectue(papetokens[papetokenindex]);
     }
     // 执行最后无管道的部分
     exectue(papetokens[0]);
 }
-// 一般执行判断
-char *exectue(char **args) // 这里就要返回管道的程序的返回值
-{
-    char *result = NULL;
-    // 基本输入判断
-    if (args[0] == NULL || args[0][0] == '\0')
-    {
-        perror("incorrect args input in exectue period");
-    }
 
-    // 如果是内置命令，函数数组中寻找命令
-    int commandNum = sizeof(commandlist) / sizeof(commandlist[0]);
-    for (int j = 0; j < commandNum; j++)
-    {
-        if (stracmp(commandlist[j], args[0]) == 0)
-        {
-            return (*commandtofind[j])(args); // 为了这个当时定下来的内建函数列表把所有内建函数全部改成了接受char**返回char**的鬼样子
-        }
-    }
-    // 如果是外置程序，进行调用
-    pid_t wpid;
-    int status;
-    int pipefd[2];
-    pid_t pid = fork();
-    if (pipe(pipefd) == -1) {
-        perror("Error in create pipe");
-        return NULL;
-    }
-    if (pid == -1)
-    {
-        perror("Error in fork the child process");
-        return result;
-    }
-    if (pid == 0) // 如果是子进程
-    {
-        // 进行管道输出
-        close(pipefd[0]);
-        dup2(pipefd[1], STDOUT_FILENO);
-        if (execvp(args[0], args) == -1)
-            perror("Error in execvp the program");
-    }
-    else if // 如果是父进程
-    {
-        close(pipefd[1]);
-        int byteNum=read(pipefd[0], result, sizeof(result));
-        if(byteNum<0)
-        {
-            perror("Cant read from the pipe pipefd[1]");
-        }
-        do
-        {
-            wpid = waitpid(pid, &status, WUNTRACED);
-        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-    }
-    // 读取管道输入并进行返回
-    return result;
-}
+
 // 程序循环
 void loop()
-{
-    int *command;
-    int STATUS = 1;
+{ 
     do
     {
         // 自定义命令提示符
-        char prompt[] = "[FangShell]" + getpwuid((getuid())) + '@' + gethostname() + ':' + getcwd() + (geteuid() == 0 ? '#' : '$' +);
+        char *prompt = "[FangShell]";
+        char temp[128];
+        struct passwd *temppasswd=getpwuid((getuid()));
+        strcat(prompt,temppasswd->pw_name);
+        strcat(prompt,"@");
+        gethostname(temp,64);
+        strcat(prompt,temp);
+        strcat(prompt,":");
+        strcpy(temp,getcwd(NULL,0));//这里的NULL后参数应该可以是任意值？
+        strcat(prompt,temp);
+        //警告替换 temp= (geteuid() == 0 ? '#' : '$' );
+        if(geteuid() == 0)
+        {
+            strcpy(temp,"#");
+        }
+        else strcpy(temp,"$");
+        strcat(prompt,temp);
         printf("%s", prompt);
 
         // 读取命令执行
-        read();
-        split(cmdin, tokens, TRUE);
+        readline();
+        split(cmdin, tokens, 1);
         rediectloop();
         // 清空全部全局变量，关闭文件描述符
         if (fdin != 0)
@@ -397,18 +429,23 @@ void loop()
         fdin = 0;
         fdout = 0;
         tokenindex = 0;
-        strcpy(cmdin, NULL);
+        memset(cmdin,0,sizeof(cmdin));
         for (int i = 0; i < 128; i++)
         {
-            strcpy(token[i], NULL);
+            memset(tokens[i],0,sizeof(tokens[i]));
         }
     } while (STATUS);
 }
 
 int main()
 {
+    printf("check");
+    char filename[64] = "home/";
+    struct passwd *temppasswd1=getpwuid((getuid()));
+    strcat(filename,temppasswd1->pw_name);
+    strcat(filename,"/.FangShellhistory.txt");
     // 打开命令记录文件
-    int fdhistory = open(~ / FangShellhistory.txt, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IXUSR);
+    fdhistory = open(filename, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IXUSR);
     void loop();
     close(fdhistory);
     return 0;
