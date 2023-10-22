@@ -16,13 +16,17 @@ int STATUS = 1;
 int fdhistory;
 
 char cmdin[256];
-char *tokens[128];
+//char *tokens[128];
+char tokens[128][64];
 int tokenindex = 0;
 int papetokenindex = 0; // pipe以为是pape,发现的时候已经太多了，怕改错就不改了
-char *papetokens[8][128];
+//char *papetokens[8][128];
+char papetokens[8][128][64];
 
-char *aliaslist[128];
-char *aliasnamelist[128];
+//char *aliaslist[128];
+char aliaslist[128][64];
+//char *aliasnamelist[128];
+char aliasnamelist[128][64];
 int aliasindex = 0;
 
 int fdout, fdin;
@@ -84,8 +88,9 @@ char **alias(char **args)
     }
     else
     {
-        aliasnamelist[aliasindex] = alias_name;
-        aliaslist[aliasindex] = alias;
+       
+        strcpy(aliasnamelist[aliasindex],alias_name);
+        strcpy(aliaslist[aliasindex],alias);
         aliasindex++;
     }
     return result;
@@ -107,8 +112,10 @@ char **unalias(char **args)
             {
                 for (int j = i; j < aliasindex - 1; j++)
                 {
-                    aliaslist[j] = aliaslist[j + 1];
-                    aliasnamelist[j] = aliasnamelist[j + 1];
+                    strcpy(aliaslist[j] ,aliaslist[j + 1]);
+                    
+                    strcpy(aliasnamelist[j] ,aliasnamelist[j + 1]);
+                    
                 }
                 aliasindex--;
             }
@@ -179,6 +186,8 @@ void readline()
     /*原教程的输入逻辑
       fflush(stdin);
       fgets(cmdin, 256, stdin);*/
+
+
     //int c;
     //while ((c = getchar()) != '\n' && c != EOF)
         //;
@@ -220,7 +229,8 @@ int split(char *cmdin, char **tokens, bool PAPEORNOT) // 参数从一个加到�
             checkthealias =0;
             break;
         }
-        tokens[tokenindex] = token;
+        
+        strcpy(tokens[tokenindex],token);
         tokenindex++; // wc，我甚至混用全局变量和函数参数来控制执行，函数可以复用，但是不完全可以复用
         token = strtok(cmdin, TOK_DELIM);
     }
@@ -236,7 +246,7 @@ int split(char *cmdin, char **tokens, bool PAPEORNOT) // 参数从一个加到�
                 papetokenindex++;
             }
             else
-                papetokens[papetokenindex][index] = tokens[i];
+            strcpy(papetokens[papetokenindex][index] ,tokens[i]);
             index++;
         }
     }
@@ -394,10 +404,13 @@ void loop()
     do
     {
         // 自定义命令提示符
-        char *prompt = "[FangShell]";
+        char prompt[1024] = "[FangShell]";
         char temp[128];
         struct passwd *temppasswd=getpwuid((getuid()));
-        strcat(prompt,temppasswd->pw_name);
+        if (temppasswd != NULL) {
+        strcat(prompt, temppasswd->pw_name);
+        } 
+        else perror("Error in get the username");
         strcat(prompt,"@");
         gethostname(temp,64);
         strcat(prompt,temp);
@@ -439,14 +452,13 @@ void loop()
 
 int main()
 {
-    printf("check");
     char filename[64] = "home/";
     struct passwd *temppasswd1=getpwuid((getuid()));
     strcat(filename,temppasswd1->pw_name);
     strcat(filename,"/.FangShellhistory.txt");
     // 打开命令记录文件
     fdhistory = open(filename, O_RDWR | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IXUSR);
-    void loop();
+    loop();
     close(fdhistory);
     return 0;
 }
