@@ -46,6 +46,7 @@ class Network(object):
         self.weights = [w - (eta / len(mini_batch)) * nw for w, nw in zip(self.weights, nabla_w)]
         self.biases = [b - (eta / len(mini_batch)) * nb for b, nb in zip(self.biases, nabla_b)]
 
+
     def backprop(self, x, y):
         nabla_b = [np.zeros(b.shape) for b in self.biases]
         nabla_w = [np.zeros(w.shape) for w in self.weights]
@@ -77,6 +78,7 @@ class Network(object):
     def cost_derivative(self, output_activations, y):
         return (output_activations - y)
 
+#定义需要的激活函数
 def sigmoid(x):
     x_ravel = x.ravel()  # 将numpy数组展平
     length = len(x_ravel)
@@ -91,6 +93,8 @@ def sigmoid(x):
 
 def sigmoid_prime(z):
     return sigmoid(z) * (1 - sigmoid(z))
+
+#开始准备运行程序
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
 realtrains=[]
 realtests=[]
