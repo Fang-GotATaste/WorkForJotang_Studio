@@ -1,3 +1,4 @@
+#这是chatgpt生成的一个使用cnn的版本。我还不能自己手写，但是我已经了解了cnn的基本原理并对以下代码有已经有了一定的理解。我已经成功运行了该代码。
 import torch
 import torch.nn as nn
 import torch.optim as optim
